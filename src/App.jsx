@@ -183,7 +183,7 @@ const STYLES = `
     flex-direction: column;
     gap: 22px;
   }
-  .sidebar-scroll::-webkit-scrollbar { width: 3px; }
+  .sidebar-scroll::-webkit-scrollbar { width: 13px; }
   .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
   .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
 
