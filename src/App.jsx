@@ -2,776 +2,724 @@ import { useState, useRef, useEffect, useCallback } from "react";
 
 const A4_W_IN = 8.27;
 const A4_H_IN = 11.69;
-const EXPORT_DPI = 150;
-const A4_W_PX = Math.round(A4_W_IN * EXPORT_DPI);
-const A4_H_PX = Math.round(A4_H_IN * EXPORT_DPI);
 const DEFAULT_COLS = 8;
 const DEFAULT_ROWS = 9;
+const DEFAULT_CELL_IN = 1.0;
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #080b12;
-    --surface: rgba(255,255,255,0.04);
-    --surface2: rgba(255,255,255,0.07);
-    --border: rgba(255,255,255,0.08);
-    --border2: rgba(255,255,255,0.14);
-    --gold: #c9a84c;
-    --gold2: #e8cc7a;
-    --text: #f0ebe2;
-    --muted: #7a7060;
-    --dim: #3a3428;
-    --red: #d94f3a;
-    --green: #2e7d52;
+    --bg:       #07090f;
+    --bg2:      #0b0e18;
+    --sf:       rgba(255,255,255,0.035);
+    --sf2:      rgba(255,255,255,0.07);
+    --bd:       rgba(255,255,255,0.07);
+    --bd2:      rgba(255,255,255,0.13);
+    --gold:     #c8a84b;
+    --gold2:    #e9cf7e;
+    --golddim:  rgba(200,168,75,0.14);
+    --text:     #ede8df;
+    --muted:    #6e6456;
+    --dim:      #2a2620;
+    --red:      #d94f3a;
+    --green:    #3a9e68;
+    --blue:     #4a8fcb;
+    --anim:     0.2s cubic-bezier(.4,0,.2,1);
+    --sw:       288px;
+    --hh:       54px;
+    --th:       38px;
   }
 
-  html, body, #root {
-    height: 100%;
-    overflow: hidden;
-  }
+  html, body, #root { height: 100%; overflow: hidden; }
+  body { background: var(--bg); font-family: 'JetBrains Mono', monospace; color: var(--text); -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
 
   .app {
-    height: 100%;
+    height: 100%; display: flex; flex-direction: column;
     background: var(--bg);
     background-image:
-      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(201,168,76,0.06) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(100,80,200,0.05) 0%, transparent 50%);
-    font-family: 'DM Mono', monospace;
-    color: var(--text);
-    display: flex;
-    flex-direction: column;
+      radial-gradient(ellipse 90% 55% at 15% -5%, rgba(200,168,75,0.055) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 88% 108%, rgba(74,143,203,0.04) 0%, transparent 50%);
+    animation: appIn 0.45s ease both;
   }
+  @keyframes appIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 
-  /* ── Header ── */
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 0 24px;
-    height: 58px;
-    border-bottom: 1px solid var(--border);
-    background: rgba(8,11,18,0.95);
-    backdrop-filter: blur(12px);
-    flex-shrink: 0;
-    position: relative;
-    z-index: 20;
+  /* Header */
+  .hdr {
+    height: var(--hh); flex-shrink: 0;
+    display: flex; align-items: center; gap: 13px; padding: 0 20px;
+    background: rgba(7,9,15,0.97); border-bottom: 1px solid var(--bd);
+    backdrop-filter: blur(14px); position: relative; z-index: 30;
   }
-  .header::after {
-    content: '';
-    position: absolute;
-    bottom: -1px; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--gold), transparent);
-    opacity: 0.35;
+  .hdr::after {
+    content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent 0%, var(--gold) 35%, var(--gold2) 65%, transparent 100%);
+    opacity: 0.28;
   }
-  .logo-mark {
-    width: 34px; height: 34px;
+  .logo {
+    width: 31px; height: 31px; border-radius: 7px; flex-shrink: 0;
     background: linear-gradient(135deg, var(--gold), var(--gold2));
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px;
-    box-shadow: 0 0 18px rgba(201,168,76,0.28);
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    box-shadow: 0 0 14px rgba(200,168,75,0.32);
+    animation: logoPulse 3.5s ease infinite;
   }
-  .header-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 18px;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--gold2), var(--text));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  @keyframes logoPulse { 0%,100%{box-shadow:0 0 14px rgba(200,168,75,0.3);} 50%{box-shadow:0 0 26px rgba(200,168,75,0.55);} }
+  .h-title {
+    font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:700;
+    background: linear-gradient(105deg, var(--gold2), var(--text));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:0.5px;
   }
-  .header-sub {
-    font-size: 9px;
-    color: var(--muted);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-top: 1px;
+  .h-sub { font-size:8px; color:var(--muted); letter-spacing:3px; text-transform:uppercase; margin-top:2px; }
+  .h-right { margin-left:auto; display:flex; align-items:center; gap:7px; }
+  .badge {
+    padding:3px 9px; border-radius:20px; font-size:8px; letter-spacing:2px; white-space:nowrap;
+    border:1px solid rgba(200,168,75,0.22); color:var(--gold); background:rgba(200,168,75,0.05);
   }
-  .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-  .header-badge {
-    padding: 4px 10px;
-    border: 1px solid rgba(201,168,76,0.22);
-    border-radius: 20px;
-    font-size: 9px;
-    color: var(--gold);
-    letter-spacing: 2px;
-    background: rgba(201,168,76,0.05);
-    white-space: nowrap;
+  .badge.ok { color:#42d68a; border-color:rgba(66,214,138,0.25); background:rgba(66,214,138,0.04); }
+
+  /* Banners */
+  .banner {
+    display:flex; align-items:center; gap:10px; padding:8px 20px; flex-shrink:0;
+    font-size:9.5px; color:var(--text); animation: slideD 0.3s ease both;
+  }
+  @keyframes slideD { from{opacity:0;transform:translateY(-7px);} to{opacity:1;transform:translateY(0);} }
+  .banner.gold-b { background:linear-gradient(90deg,rgba(200,168,75,0.1),rgba(200,168,75,0.04)); border-bottom:1px solid rgba(200,168,75,0.16); }
+  .banner.blue-b { background:linear-gradient(90deg,rgba(74,143,203,0.1),rgba(74,143,203,0.04)); border-bottom:1px solid rgba(74,143,203,0.18); }
+  .banner .btext { flex:1; line-height:1.5; }
+  .banner strong { color:var(--gold); font-weight:500; }
+  .banner .blue-b strong { color:#7ac4f5; }
+  .btn-sm {
+    border:none; border-radius:6px; padding:5px 11px;
+    font-family:'JetBrains Mono',monospace; font-size:8.5px; letter-spacing:1px;
+    cursor:pointer; flex-shrink:0; transition:all var(--anim);
+  }
+  .btn-sm.gold { background:linear-gradient(135deg,var(--gold),var(--gold2)); color:#07090f; font-weight:600; }
+  .btn-sm.gold:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(200,168,75,0.4); }
+  .btn-sm.blue { background:var(--blue); color:#fff; }
+  .btn-sm.blue:hover { opacity:0.85; }
+  .btn-x { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:2px 5px; flex-shrink:0; transition:color var(--anim); }
+  .btn-x:hover { color:var(--text); }
+
+  /* Body */
+  .body { display:flex; flex:1; overflow:hidden; }
+
+  /* Sidebar */
+  .sb {
+    width:var(--sw); flex-shrink:0;
+    background:var(--bg2); border-right:1px solid var(--bd);
+    display:flex; flex-direction:column; overflow:hidden;
   }
 
-  /* Install banner */
-  .install-banner {
-    background: linear-gradient(135deg, rgba(201,168,76,0.12), rgba(201,168,76,0.06));
-    border-bottom: 1px solid rgba(201,168,76,0.2);
-    padding: 10px 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 11px;
-    color: var(--text);
-    flex-shrink: 0;
-    z-index: 10;
+  /* Tabs */
+  .tabs { display:flex; flex-shrink:0; border-bottom:1px solid var(--bd); background:rgba(7,9,15,0.5); }
+  .tab {
+    flex:1; height:var(--th);
+    display:flex; align-items:center; justify-content:center; gap:4px;
+    font-size:7.5px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--muted); cursor:pointer; border:none; background:none;
+    position:relative; transition:color var(--anim);
+    font-family:'JetBrains Mono',monospace;
   }
-  .install-banner .ib-icon { font-size: 18px; }
-  .install-banner .ib-text { flex: 1; line-height: 1.5; }
-  .install-banner .ib-text strong { color: var(--gold); font-weight: 500; }
-  .install-banner .ib-text span { color: var(--muted); font-size: 10px; }
-  .btn-install {
-    background: linear-gradient(135deg, var(--gold), var(--gold2));
-    color: #080b12;
-    border: none;
-    border-radius: 8px;
-    padding: 7px 14px;
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
+  .tab:hover { color:var(--text); }
+  .tab.on { color:var(--gold); }
+  .tab.on::after {
+    content:''; position:absolute; bottom:-1px; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,var(--gold),var(--gold2)); border-radius:2px 2px 0 0;
+    animation:tline 0.25s ease both;
   }
-  .btn-dismiss {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 16px;
-    padding: 2px 6px;
-    flex-shrink: 0;
+  @keyframes tline { from{transform:scaleX(0);} to{transform:scaleX(1);} }
+  .tdot {
+    width:5px; height:5px; border-radius:50%; background:var(--red); flex-shrink:0;
+    animation:dpulse 1.5s ease infinite;
   }
+  @keyframes dpulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
 
-  /* iOS install hint */
-  .ios-hint {
-    background: rgba(201,168,76,0.06);
-    border-bottom: 1px solid rgba(201,168,76,0.15);
-    padding: 10px 24px;
-    font-size: 10px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-  .ios-hint strong { color: var(--gold); }
+  /* Panel */
+  .panel { flex:1; overflow-y:auto; overflow-x:hidden; padding:17px 15px 0; display:flex; flex-direction:column; gap:17px; }
+  .panel.off { display:none; }
 
-  /* ── Layout ── */
-  .body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
+  .slabel {
+    font-size:8px; letter-spacing:4px; text-transform:uppercase; color:var(--gold);
+    margin-bottom:10px; display:flex; align-items:center; gap:7px;
   }
+  .slabel::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,var(--bd2),transparent); }
 
-  /* ── Sidebar ── */
-  .sidebar {
-    width: 272px;
-    flex-shrink: 0;
-    background: rgba(10,12,18,0.98);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .sidebar-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 22px 18px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 22px;
-  }
-  .sidebar-scroll::-webkit-scrollbar { width: 13px; }
-  .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-  .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+  .fl { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
 
-  .section-label {
-    font-size: 9px;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .irow { display:flex; gap:7px; }
+  .nw { flex:1; }
+  .nw input, .nw select {
+    width:100%; background:var(--sf); border:1px solid var(--bd); border-radius:7px;
+    color:var(--text); padding:7px 9px; font-size:13px;
+    font-family:'JetBrains Mono',monospace; outline:none; appearance:none;
+    transition:border-color var(--anim), background var(--anim), box-shadow var(--anim);
   }
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, var(--border2), transparent);
-  }
+  .nw input:hover,.nw select:hover { border-color:var(--bd2); }
+  .nw input:focus,.nw select:focus { border-color:var(--gold); background:var(--sf2); box-shadow:0 0 0 3px rgba(200,168,75,0.07); }
 
-  .field-label {
-    font-size: 9px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 5px;
+  .icard {
+    background:var(--sf); border:1px solid var(--bd); border-radius:9px;
+    padding:10px 11px; margin-top:7px; display:flex; flex-direction:column; gap:5px;
   }
+  .ir { display:flex; justify-content:space-between; font-size:9px; }
+  .ir .k { color:var(--muted); } .ir .v { color:var(--text); } .ir .va { color:var(--gold); font-weight:500; }
 
-  .input-row { display: flex; gap: 8px; }
+  .crow { display:flex; gap:7px; align-items:flex-end; margin-bottom:9px; }
+  .cw { flex:1.2; }
+  .cw input[type="color"] {
+    width:100%; height:33px; border:1px solid var(--bd); border-radius:7px;
+    background:var(--sf); cursor:pointer; padding:3px; transition:border-color var(--anim);
+  }
+  .cw input[type="color"]:hover { border-color:var(--bd2); }
 
-  .num-wrap { flex: 1; }
-  .num-wrap input {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    padding: 8px 10px;
-    font-size: 14px;
-    font-family: 'DM Mono', monospace;
-    outline: none;
-    transition: border-color 0.2s, background 0.2s;
-  }
-  .num-wrap input:focus {
-    border-color: var(--gold);
-    background: var(--surface2);
-  }
+  .slw { margin-bottom:2px; }
+  .slw input[type="range"] { width:100%; accent-color:var(--gold); cursor:pointer; }
 
-  .info-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 13px;
-    margin-top: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .dzone {
+    border:1.5px dashed var(--bd2); border-radius:11px;
+    padding:18px 13px; text-align:center; cursor:pointer;
+    transition:all var(--anim); background:var(--sf); position:relative; overflow:hidden;
   }
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
+  .dzone::before {
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(ellipse at 50% 0%,rgba(200,168,75,0.07) 0%,transparent 70%);
+    opacity:0; transition:opacity var(--anim);
   }
-  .info-row .k { color: var(--muted); }
-  .info-row .v { color: var(--text); }
-  .info-row .v.accent { color: var(--gold); font-weight: 500; }
+  .dzone:hover::before,.dzone.drag::before { opacity:1; }
+  .dzone:hover,.dzone.drag { border-color:var(--gold); }
+  .dicon { font-size:22px; margin-bottom:6px; opacity:0.5; transition:transform var(--anim); }
+  .dzone:hover .dicon { transform:translateY(-2px); opacity:0.75; }
+  .dtext { font-size:9px; color:var(--muted); letter-spacing:1px; line-height:1.7; }
+  .dtext strong { color:var(--gold); font-weight:400; }
 
-  .color-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
-  .color-wrap { flex: 1; }
-  .color-wrap input[type="color"] {
-    width: 100%; height: 36px;
-    border: 1px solid var(--border); border-radius: 8px;
-    background: var(--surface); cursor: pointer; padding: 3px;
-  }
+  .ithumb { margin-top:9px; border-radius:7px; overflow:hidden; border:1px solid var(--bd); animation:fadeIn 0.3s ease both; }
+  @keyframes fadeIn { from{opacity:0;transform:scale(0.97);} to{opacity:1;transform:scale(1);} }
+  .ithumb img { width:100%; height:75px; object-fit:cover; display:block; }
+  .ithumb-info { padding:5px 8px; background:var(--sf); font-size:8.5px; color:var(--muted); display:flex; justify-content:space-between; }
+  .ithumb-info em { color:var(--gold); font-style:normal; }
 
-  .slider-wrap { margin-bottom: 2px; }
-  .slider-wrap input[type="range"] {
-    width: 100%; accent-color: var(--gold); cursor: pointer;
+  .ftog { display:flex; border-radius:7px; overflow:hidden; border:1px solid var(--bd); }
+  .fbtn {
+    flex:1; padding:6px 4px; font-family:'JetBrains Mono',monospace; font-size:7.5px;
+    letter-spacing:1px; text-transform:uppercase; border:none; cursor:pointer;
+    background:var(--sf); color:var(--muted); transition:all var(--anim);
   }
+  .fbtn.on { background:var(--golddim); color:var(--gold); }
+  .fbtn:not(.on):hover { background:var(--sf2); color:var(--text); }
 
-  .drop-zone {
-    border: 1.5px dashed var(--border2);
-    border-radius: 12px;
-    padding: 18px 14px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    background: var(--surface);
+  .chips { display:flex; gap:5px; flex-wrap:wrap; }
+  .chip {
+    padding:4px 9px; border-radius:5px; font-size:8px; letter-spacing:1.5px; text-transform:uppercase;
+    border:1px solid var(--bd); background:var(--sf); color:var(--muted); cursor:pointer;
+    font-family:'JetBrains Mono',monospace; transition:all var(--anim);
   }
-  .drop-zone:hover, .drop-zone.drag-active {
-    border-color: var(--gold);
-    background: rgba(201,168,76,0.05);
-  }
-  .drop-icon { font-size: 26px; margin-bottom: 6px; opacity: 0.55; }
-  .drop-text { font-size: 10px; color: var(--muted); letter-spacing: 1px; line-height: 1.7; }
-  .drop-text strong { color: var(--gold); font-weight: 400; }
+  .chip:hover { border-color:var(--bd2); color:var(--text); }
+  .chip.on { border-color:var(--gold); color:var(--gold); background:var(--golddim); }
+  .chip.blue-on { border-color:var(--blue); color:#7ac4f5; background:rgba(74,143,203,0.09); }
 
   .btn {
-    width: 100%;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    width:100%; border:none; border-radius:8px; padding:8px 13px;
+    font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase;
+    cursor:pointer; transition:all var(--anim); display:flex; align-items:center; justify-content:center; gap:6px;
   }
-  .btn-ghost {
-    background: var(--surface);
-    color: var(--muted);
-    border: 1px solid var(--border);
-    margin-top: 8px;
-  }
-  .btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+  .btn.ghost { background:var(--sf); color:var(--muted); border:1px solid var(--bd); margin-top:7px; }
+  .btn.ghost:hover { background:var(--sf2); color:var(--text); border-color:var(--bd2); }
 
-  .divider { height: 1px; background: var(--border); margin: 0 -18px; }
+  .div { height:1px; background:var(--bd); margin:0 -15px; }
 
-  /* Sidebar footer */
-  .sidebar-footer {
-    padding: 16px 18px 20px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-    flex-shrink: 0;
+  /* Footer */
+  .sbfoot { padding:13px 15px 17px; border-top:1px solid var(--bd); display:flex; flex-direction:column; gap:7px; flex-shrink:0; }
+  .expbtn {
+    background:linear-gradient(135deg,#c8a84b 0%,#e9cf7e 100%); color:#07090f;
+    font-weight:600; font-size:9.5px; box-shadow:0 4px 14px rgba(200,168,75,0.18); padding:11px 13px;
+    position:relative; overflow:hidden;
   }
-  .btn-export {
-    background: linear-gradient(135deg, #c9a84c, #e8cc7a);
-    color: #080b12;
-    font-weight: 600;
-    font-size: 11px;
-    box-shadow: 0 4px 18px rgba(201,168,76,0.22);
-    padding: 12px 14px;
+  .expbtn::before {
+    content:''; position:absolute; top:0; left:-100%; width:55%; height:100%;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.22),transparent);
+    transition:left 0.55s ease;
   }
-  .btn-export:hover {
-    box-shadow: 0 6px 26px rgba(201,168,76,0.38);
-    transform: translateY(-1px);
-  }
-  .btn-export.success {
-    background: linear-gradient(135deg, #2e7d52, #42b872);
-    box-shadow: 0 4px 18px rgba(66,184,114,0.28);
-  }
-  .print-hint {
-    font-size: 9px;
-    color: var(--muted);
-    text-align: center;
-    line-height: 1.9;
-    letter-spacing: 1px;
-  }
-  .print-hint strong { color: var(--gold); font-weight: 400; }
+  .expbtn:hover::before { left:160%; }
+  .expbtn:hover { box-shadow:0 6px 22px rgba(200,168,75,0.36); transform:translateY(-1px); }
+  .expbtn.ok { background:linear-gradient(135deg,#2e8a5c,#42d68a); box-shadow:0 4px 14px rgba(66,214,138,0.22); }
+  .expbtn:disabled { opacity:0.7; cursor:wait; }
+  .phint { font-size:8px; color:var(--muted); text-align:center; line-height:1.9; letter-spacing:1px; }
+  .phint strong { color:var(--gold); font-weight:400; }
 
-  /* ── Main ── */
+  /* Main */
   .main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 32px 24px;
-    overflow: auto;
-    position: relative;
-    gap: 16px;
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:26px 22px; overflow:auto; position:relative; gap:13px;
   }
   .main::before {
-    content: '';
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
-    background-size: 36px 36px;
-    pointer-events: none;
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,0.009) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.009) 1px,transparent 1px);
+    background-size:30px 30px;
   }
+  .pvlabel { font-size:8px; letter-spacing:5px; text-transform:uppercase; color:var(--muted); position:relative; z-index:1; }
 
-  .preview-label {
-    font-size: 9px;
-    letter-spacing: 5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    position: relative; z-index: 1;
+  .couter { position:relative; z-index:1; }
+  .rulh, .rulv {
+    position:absolute; font-size:7px; color:rgba(200,168,75,0.6);
+    pointer-events:none; letter-spacing:1px;
+    background:rgba(200,168,75,0.07); border-radius:3px; display:flex; align-items:center; justify-content:center;
   }
+  .rulh { top:-17px; left:0; right:0; height:14px; }
+  .rulv { left:-19px; top:0; bottom:0; width:17px; writing-mode:vertical-rl; transform:rotate(180deg); }
 
-  .canvas-wrap {
-    position: relative; z-index: 1;
-    border-radius: 3px;
-    overflow: hidden;
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.06),
-      0 20px 55px rgba(0,0,0,0.7),
-      0 4px 14px rgba(0,0,0,0.5);
-    transition: box-shadow 0.3s;
-    max-width: 100%;
+  .cwrap {
+    border-radius:3px; overflow:hidden;
+    box-shadow:0 0 0 1px rgba(255,255,255,0.05),0 22px 58px rgba(0,0,0,0.72),0 4px 14px rgba(0,0,0,0.45);
+    transition:box-shadow 0.3s; max-width:100%;
+    animation:cvIn 0.4s ease both;
   }
-  .canvas-wrap:hover {
-    box-shadow:
-      0 0 0 1px rgba(201,168,76,0.14),
-      0 22px 60px rgba(0,0,0,0.75),
-      0 4px 18px rgba(0,0,0,0.5);
-  }
-  .canvas-wrap canvas { display: block; max-width: 100%; height: auto; }
+  @keyframes cvIn { from{opacity:0;transform:scale(0.97) translateY(7px);} to{opacity:1;transform:scale(1) translateY(0);} }
+  .cwrap:hover { box-shadow:0 0 0 1px rgba(200,168,75,0.11),0 26px 66px rgba(0,0,0,0.78),0 4px 18px rgba(0,0,0,0.45); }
+  .cwrap canvas { display:block; max-width:100%; height:auto; }
 
-  .preview-footer {
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 2px;
-    text-align: center;
-    position: relative; z-index: 1;
-    line-height: 1.9;
-  }
-  .preview-footer span { color: var(--gold); }
+  .pvfoot { font-size:9px; color:var(--muted); letter-spacing:2px; text-align:center; position:relative; z-index:1; line-height:2; }
+  .pvfoot span { color:var(--gold); }
+  .warn { font-size:8.5px; color:var(--red); background:rgba(217,79,58,0.06); border:1px solid rgba(217,79,58,0.14); border-radius:5px; padding:6px 9px; margin-top:5px; letter-spacing:1px; line-height:1.6; animation:fadeIn 0.2s ease both; }
 
-  .warn {
-    font-size: 10px;
-    color: var(--red);
-    background: rgba(217,79,58,0.08);
-    border: 1px solid rgba(217,79,58,0.18);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin-top: 8px;
-    letter-spacing: 1px;
-    line-height: 1.6;
-  }
-
-  /* iPad responsive */
-  @media (max-width: 768px) {
-    .sidebar { width: 230px; }
-    .header-sub { display: none; }
-    .main { padding: 20px 16px; }
-  }
-  @media (max-width: 600px) {
-    .body { flex-direction: column; }
-    .sidebar {
-      width: 100%;
-      height: auto;
-      border-right: none;
-      border-bottom: 1px solid var(--border);
-    }
-    .sidebar-scroll { padding: 14px 14px 0; }
-    .main { padding: 16px; gap: 12px; }
-  }
+  @media(max-width:820px){:root{--sw:238px;} .h-sub{display:none;}}
+  @media(max-width:620px){.body{flex-direction:column;} :root{--sw:100%;} .sb{height:auto;border-right:none;border-bottom:1px solid var(--bd);} .main{padding:14px;}}
 `;
 
+function hexToRGB(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+
+function getFitRect(iw, ih, bw, bh, mode) {
+  if (mode === "fill") return { x:0, y:0, w:bw, h:bh };
+  const ir = iw/ih, br = bw/bh;
+  let w, h;
+  if (mode === "fit")   { if(ir>br){w=bw;h=bw/ir;}else{h=bh;w=bh*ir;} }
+  if (mode === "cover") { if(ir>br){h=bh;w=bh*ir;}else{w=bw;h=bw/ir;} }
+  return { x:(bw-w)/2, y:(bh-h)/2, w, h };
+}
+
 export default function GridMaker() {
-  const [image, setImage] = useState(null);
-  const [cols, setCols] = useState(DEFAULT_COLS);
-  const [rows, setRows] = useState(DEFAULT_ROWS);
-  const [lineColor, setLineColor] = useState("#c9a84c");
-  const [lineWidth, setLineWidth] = useState(1.5);
-  const [lineOpacity, setLineOpacity] = useState(0.85);
-  const [dragging, setDragging] = useState(false);
-  const [exported, setExported] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [showIOSHint, setShowIOSHint] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [cols,    setCols]    = useState(DEFAULT_COLS);
+  const [rows,    setRows]    = useState(DEFAULT_ROWS);
+  const [cellIn,  setCellIn]  = useState(DEFAULT_CELL_IN);
+  const [lColor,  setLColor]  = useState("#c8a84b");
+  const [lWidth,  setLWidth]  = useState(1.5);
+  const [lOpacity,setLOpacity]= useState(0.85);
+  const [image,   setImage]   = useState(null);
+  const [imgMeta, setImgMeta] = useState(null);
+  const [fitMode, setFitMode] = useState("fit");
+  const [dragging,setDragging]= useState(false);
+  const [eFmt,    setEFmt]    = useState("png");
+  const [eDPI,    setEDPI]    = useState(150);
+  const [exported,setExported]= useState(false);
+  const [exporting,setExporting]= useState(false);
+  const [installPrompt,setInstallPrompt] = useState(null);
+  const [showInstall, setShowInstall] = useState(false);
+  const [isIOS,   setIsIOS]   = useState(false);
+  const [showIOS, setShowIOS] = useState(false);
+  const [installed,setInstalled]= useState(false);
+  const [showUpdate,setShowUpdate]= useState(false);
+  const [tab,     setTab]     = useState("grid");
+  const [dots,    setDots]    = useState({});
+  const prev = useRef({ cols, rows, cellIn, lColor, lWidth, lOpacity, fitMode });
 
-  const previewRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const imgRef = useRef(null);
-  const containerRef = useRef(null);
+  const previewRef  = useRef(null);
+  const fileRef     = useRef(null);
+  const imgRef      = useRef(null);
+  const mainRef     = useRef(null);
+  const [pScale,    setPScale] = useState(0.36);
 
-  // Dynamic preview scale based on container
-  const [previewScale, setPreviewScale] = useState(0.38);
+  // Derived
+  const gridWin   = cols * cellIn;
+  const gridHin   = rows * cellIn;
+  const expCellPx = eDPI * cellIn;
+  const expGridW  = Math.round(cols * expCellPx);
+  const expGridH  = Math.round(rows * expCellPx);
+  const expA4W    = Math.round(A4_W_IN * eDPI);
+  const expA4H    = Math.round(A4_H_IN * eDPI);
+  const mSide     = ((A4_W_IN - gridWin)/2).toFixed(2);
+  const mTop      = ((A4_H_IN - gridHin)/2).toFixed(2);
+  const tooBig    = gridWin > A4_W_IN || gridHin > A4_H_IN;
 
+  // Preview dims
+  const pvA4W = Math.round(expA4W * pScale);
+  const pvA4H = Math.round(expA4H * pScale);
+
+  // Resize observer for preview scale
   useEffect(() => {
-    const updateScale = () => {
-      if (containerRef.current) {
-        const w = containerRef.current.clientWidth - 64;
-        const h = containerRef.current.clientHeight - 100;
-        const scaleW = w / A4_W_PX;
-        const scaleH = h / A4_H_PX;
-        setPreviewScale(Math.min(scaleW, scaleH, 0.42));
-      }
+    const update = () => {
+      if (!mainRef.current) return;
+      const w = mainRef.current.clientWidth  - 55;
+      const h = mainRef.current.clientHeight - 85;
+      setPScale(Math.min(w/expA4W, h/expA4H, 0.44));
     };
-    updateScale();
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, []);
+    update();
+    const ro = new ResizeObserver(update);
+    if (mainRef.current) ro.observe(mainRef.current);
+    return () => ro.disconnect();
+  }, [expA4W, expA4H]);
 
-  const previewA4W = Math.round(A4_W_PX * previewScale);
-  const previewA4H = Math.round(A4_H_PX * previewScale);
+  // Change dot detection
+  useEffect(() => {
+    const c = { cols, rows, cellIn, lColor, lWidth, lOpacity, fitMode };
+    const p = prev.current;
+    const d = {};
+    if (c.cols!==p.cols||c.rows!==p.rows||c.cellIn!==p.cellIn) d.grid=true;
+    if (c.lColor!==p.lColor||c.lWidth!==p.lWidth||c.lOpacity!==p.lOpacity) d.lines=true;
+    if (c.fitMode!==p.fitMode) d.image=true;
+    setDots(d); prev.current = c;
+  }, [cols, rows, cellIn, lColor, lWidth, lOpacity, fitMode]);
 
-  // PWA install logic
+  const goTab = (t) => { setTab(t); setDots(d => ({...d,[t]:false})); };
+
+  // PWA
   useEffect(() => {
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-    setIsIOS(ios);
-    setIsInstalled(standalone);
-
-    if (ios && !standalone) setShowIOSHint(true);
-
-    const handler = (e) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-      setShowInstallBanner(true);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    window.addEventListener("appinstalled", () => {
-      setIsInstalled(true);
-      setShowInstallBanner(false);
-    });
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    const sa  = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+    setIsIOS(ios); setInstalled(sa);
+    if (ios && !sa) setShowIOS(true);
+    window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); });
+    window.addEventListener("appinstalled", () => { setInstalled(true); setShowInstall(false); });
   }, []);
-
-  const handleInstall = async () => {
+  const doInstall = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") setShowInstallBanner(false);
+    const {outcome} = await installPrompt.userChoice;
+    if (outcome==="accepted") setShowInstall(false);
     setInstallPrompt(null);
   };
 
-  const getRGB = useCallback(() => {
-    const hex = lineColor;
-    return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
-  }, [lineColor]);
-
-  const drawPreview = useCallback(() => {
-    const canvas = previewRef.current;
+  // Draw function (works for both preview and export)
+  const draw = useCallback((canvas, cw, ch, scale) => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, previewA4W, previewA4H);
-
+    ctx.clearRect(0, 0, cw, ch);
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, previewA4W, previewA4H);
+    ctx.fillRect(0, 0, cw, ch);
 
-    const cellPx = Math.round(EXPORT_DPI * previewScale);
-    const gridWpx = cols * cellPx;
-    const gridHpx = rows * cellPx;
-    const offsetX = Math.round((previewA4W - gridWpx) / 2);
-    const offsetY = Math.round((previewA4H - gridHpx) / 2);
+    const cellPx  = eDPI * cellIn * scale;
+    const gridWpx = cols  * cellPx;
+    const gridHpx = rows  * cellPx;
+    const offX    = Math.round((cw - gridWpx) / 2);
+    const offY    = Math.round((ch - gridHpx) / 2);
 
+    // Image
     if (imgRef.current) {
-      ctx.drawImage(imgRef.current, offsetX, offsetY, gridWpx, gridHpx);
-    } else {
-      ctx.fillStyle = "#f8f4ef";
-      ctx.fillRect(offsetX, offsetY, gridWpx, gridHpx);
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if ((r + c) % 2 === 0) {
-            ctx.fillStyle = "#f0ebe3";
-            ctx.fillRect(offsetX + c * cellPx, offsetY + r * cellPx, cellPx, cellPx);
-          }
-        }
+      const img = imgRef.current;
+      const r   = getFitRect(img.naturalWidth, img.naturalHeight, gridWpx, gridHpx, fitMode);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(offX, offY, gridWpx, gridHpx); ctx.clip();
+      ctx.drawImage(img, offX + r.x, offY + r.y, r.w, r.h);
+      ctx.restore();
+    } else if (scale < 1) {
+      ctx.fillStyle = "#f7f3ee"; ctx.fillRect(offX, offY, gridWpx, gridHpx);
+      for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
+        if ((r+c)%2===0){ctx.fillStyle="#ede7de";ctx.fillRect(offX+c*cellPx,offY+r*cellPx,cellPx,cellPx);}
       }
-      ctx.fillStyle = "#c8b898";
-      ctx.font = `${Math.max(8, cellPx * 0.2)}px Georgia, serif`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("Drop or tap to load image", offsetX + gridWpx / 2, offsetY + gridHpx / 2 - cellPx * 0.15);
-      ctx.font = `italic ${Math.max(7, cellPx * 0.14)}px Georgia, serif`;
-      ctx.fillStyle = "#d8c8a8";
-      ctx.fillText(`${cols} × ${rows} grid · 1 inch per cell`, offsetX + gridWpx / 2, offsetY + gridHpx / 2 + cellPx * 0.2);
+      ctx.fillStyle="#bca882"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font=`${Math.max(8,cellPx*0.19)}px Georgia,serif`;
+      ctx.fillText("Drop or tap to load image", offX+gridWpx/2, offY+gridHpx/2-cellPx*0.14);
+      ctx.font=`italic ${Math.max(7,cellPx*0.13)}px Georgia,serif`;
+      ctx.fillStyle="#cfc0a0";
+      ctx.fillText(`${cols}×${rows} grid · ${cellIn}" per cell`, offX+gridWpx/2, offY+gridHpx/2+cellPx*0.21);
     }
 
-    const [r2, g2, b2] = getRGB();
-    ctx.strokeStyle = `rgba(${r2},${g2},${b2},${lineOpacity})`;
-    ctx.lineWidth = lineWidth * previewScale;
-    for (let c = 0; c <= cols; c++) {
-      ctx.beginPath();
-      ctx.moveTo(offsetX + c * cellPx, offsetY);
-      ctx.lineTo(offsetX + c * cellPx, offsetY + gridHpx);
-      ctx.stroke();
+    // Grid lines
+    const [r2,g2,b2] = hexToRGB(lColor);
+    ctx.strokeStyle = `rgba(${r2},${g2},${b2},${lOpacity})`;
+    ctx.lineWidth   = lWidth * (scale < 1 ? Math.max(0.5, scale * 1.3) : 1);
+    for (let c=0;c<=cols;c++){ctx.beginPath();ctx.moveTo(offX+c*cellPx,offY);ctx.lineTo(offX+c*cellPx,offY+gridHpx);ctx.stroke();}
+    for (let r=0;r<=rows;r++){ctx.beginPath();ctx.moveTo(offX,offY+r*cellPx);ctx.lineTo(offX+gridWpx,offY+r*cellPx);ctx.stroke();}
+
+    if (scale<1){
+      ctx.strokeStyle="rgba(170,145,100,0.08)";ctx.lineWidth=0.5;
+      ctx.setLineDash([3,5]);ctx.strokeRect(offX,offY,gridWpx,gridHpx);ctx.setLineDash([]);
     }
-    for (let r = 0; r <= rows; r++) {
-      ctx.beginPath();
-      ctx.moveTo(offsetX, offsetY + r * cellPx);
-      ctx.lineTo(offsetX + gridWpx, offsetY + r * cellPx);
-      ctx.stroke();
-    }
+  }, [cols, rows, cellIn, lColor, lWidth, lOpacity, fitMode, eDPI, image]);
 
-    ctx.strokeStyle = "rgba(180,160,120,0.1)";
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([3, 5]);
-    ctx.strokeRect(offsetX, offsetY, gridWpx, gridHpx);
-    ctx.setLineDash([]);
-  }, [image, cols, rows, lineColor, lineWidth, lineOpacity, previewA4W, previewA4H, previewScale, getRGB]);
+  useEffect(() => { draw(previewRef.current, pvA4W, pvA4H, pScale); }, [draw, pvA4W, pvA4H, pScale]);
 
-  useEffect(() => { drawPreview(); }, [drawPreview]);
-
-  const loadImage = (file) => {
-    if (!file || !file.type.startsWith("image/")) return;
+  const loadImg = (file) => {
+    if (!file||!file.type.startsWith("image/")) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       const img = new Image();
-      img.onload = () => { imgRef.current = img; setImage(e.target.result); };
+      img.onload = () => {
+        imgRef.current = img;
+        setImage(e.target.result);
+        setImgMeta({w:img.naturalWidth,h:img.naturalHeight,name:file.name,size:(file.size/1024).toFixed(0)});
+        goTab("image");
+      };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault(); setDragging(false);
-    loadImage(e.dataTransfer.files[0]);
-  };
+  const onDrop = e => { e.preventDefault(); setDragging(false); loadImg(e.dataTransfer.files[0]); };
 
-  const exportPNG = () => {
+  const doExport = async () => {
+    setExporting(true);
+    await new Promise(r=>setTimeout(r,60));
     const canvas = document.createElement("canvas");
-    canvas.width = A4_W_PX; canvas.height = A4_H_PX;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, A4_W_PX, A4_H_PX);
-
-    const cellPx = EXPORT_DPI;
-    const gridWpx = cols * cellPx;
-    const gridHpx = rows * cellPx;
-    const offsetX = Math.round((A4_W_PX - gridWpx) / 2);
-    const offsetY = Math.round((A4_H_PX - gridHpx) / 2);
-
-    if (imgRef.current) ctx.drawImage(imgRef.current, offsetX, offsetY, gridWpx, gridHpx);
-
-    const [r2, g2, b2] = getRGB();
-    ctx.strokeStyle = `rgba(${r2},${g2},${b2},${lineOpacity})`;
-    ctx.lineWidth = lineWidth;
-    for (let c = 0; c <= cols; c++) {
-      ctx.beginPath(); ctx.moveTo(offsetX + c * cellPx, offsetY);
-      ctx.lineTo(offsetX + c * cellPx, offsetY + gridHpx); ctx.stroke();
-    }
-    for (let r = 0; r <= rows; r++) {
-      ctx.beginPath(); ctx.moveTo(offsetX, offsetY + r * cellPx);
-      ctx.lineTo(offsetX + gridWpx, offsetY + r * cellPx); ctx.stroke();
-    }
-
+    canvas.width  = expA4W; canvas.height = expA4H;
+    draw(canvas, expA4W, expA4H, 1.0);
+    const mime = {png:"image/png", jpg:"image/jpeg", webp:"image/webp"}[eFmt];
+    const ext  = eFmt;
+    const q    = eFmt==="png"?1:0.92;
     const link = document.createElement("a");
-    link.download = `grid-${cols}x${rows}-A4-print.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.download = `grid-${cols}x${rows}-${cellIn}in-A4.${ext}`;
+    link.href = canvas.toDataURL(mime, q);
     link.click();
-    setExported(true);
-    setTimeout(() => setExported(false), 2500);
+    setExporting(false); setExported(true);
+    setTimeout(()=>setExported(false), 2600);
   };
 
-  const marginSide = ((A4_W_IN - cols) / 2).toFixed(2);
-  const marginTopVal = ((A4_H_IN - rows) / 2).toFixed(2);
-  const gridTooBig = cols > Math.floor(A4_W_IN) || rows > Math.floor(A4_H_IN);
+  const TABS = [{id:"grid",l:"Grid"},{id:"lines",l:"Lines"},{id:"image",l:"Image"},{id:"export",l:"Export"}];
 
   return (
     <>
       <style>{STYLES}</style>
       <div className="app">
 
-        {/* Header */}
-        <header className="header">
-          <div className="logo-mark">⊞</div>
+        {/* ── Header ── */}
+        <header className="hdr">
+          <div className="logo">⊞</div>
           <div>
-            <div className="header-title">Grid Maker</div>
-            <div className="header-sub">A4 · 1 inch per cell · Print Ready</div>
+            <div className="h-title">Grid Maker</div>
+            <div className="h-sub">A4 · Dynamic cell size · Multi-format export</div>
           </div>
-          <div className="header-right">
-            {!isInstalled && <div className="header-badge">Install as App</div>}
-            {isInstalled && <div className="header-badge" style={{color:"#42b872",borderColor:"rgba(66,184,114,0.3)"}}>✓ Installed</div>}
+          <div className="h-right">
+            {installed ? <div className="badge ok">✓ Installed</div> : <div className="badge">Install as App</div>}
           </div>
         </header>
 
-        {/* Install banner - Chrome/Android */}
-        {showInstallBanner && !isInstalled && (
-          <div className="install-banner">
-            <div className="ib-icon">📲</div>
-            <div className="ib-text">
-              <strong>Install Grid Maker as an app</strong><br />
-              <span>Works offline · No browser bar · Opens instantly</span>
-            </div>
-            <button className="btn-install" onClick={handleInstall}>Install</button>
-            <button className="btn-dismiss" onClick={() => setShowInstallBanner(false)}>✕</button>
+        {/* ── Update banner ── */}
+        {showUpdate && (
+          <div className="banner blue-b">
+            <span style={{fontSize:14}}>🔄</span>
+            <div className="btext"><strong style={{color:"#7ac4f5"}}>Update available</strong> — new features ready to load</div>
+            <button className="btn-sm blue" onClick={()=>{setShowUpdate(false);window.location.reload();}}>Update</button>
+            <button className="btn-x" onClick={()=>setShowUpdate(false)}>✕</button>
           </div>
         )}
 
-        {/* iOS Safari hint */}
-        {isIOS && showIOSHint && !isInstalled && (
-          <div className="ios-hint">
-            <span>📤</span>
-            <span>To install: tap <strong>Share</strong> → <strong>"Add to Home Screen"</strong> to use offline like an app</span>
-            <button className="btn-dismiss" onClick={() => setShowIOSHint(false)}>✕</button>
+        {/* ── Install banners ── */}
+        {showInstall && !installed && (
+          <div className="banner gold-b">
+            <span style={{fontSize:14}}>📲</span>
+            <div className="btext"><strong>Install Grid Maker</strong><br /><span style={{color:"var(--muted)",fontSize:"8.5px"}}>Works offline · No browser bar · Opens instantly</span></div>
+            <button className="btn-sm gold" onClick={doInstall}>Install</button>
+            <button className="btn-x" onClick={()=>setShowInstall(false)}>✕</button>
+          </div>
+        )}
+        {isIOS && showIOS && !installed && (
+          <div className="banner gold-b">
+            <span style={{fontSize:14}}>📤</span>
+            <div className="btext">Tap <strong>Share</strong> → <strong>"Add to Home Screen"</strong></div>
+            <button className="btn-x" onClick={()=>setShowIOS(false)}>✕</button>
           </div>
         )}
 
         <div className="body">
-          {/* Sidebar */}
-          <aside className="sidebar">
-            <div className="sidebar-scroll">
+          {/* ── Sidebar ── */}
+          <aside className="sb">
 
-              {/* Grid Size */}
+            {/* Tabs */}
+            <div className="tabs">
+              {TABS.map(t=>(
+                <button key={t.id} className={`tab${tab===t.id?" on":""}`} onClick={()=>goTab(t.id)}>
+                  {t.l}{dots[t.id]&&tab!==t.id&&<span className="tdot"/>}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Grid Tab ── */}
+            <div className={`panel${tab==="grid"?"":" off"}`}>
               <div>
-                <div className="section-label">Grid Size</div>
-                <div className="input-row">
-                  <div className="num-wrap">
-                    <div className="field-label">Columns</div>
-                    <input type="number" value={cols} min={1} max={20}
-                      onChange={e => setCols(Number(e.target.value))} />
+                <div className="slabel">Columns & Rows</div>
+                <div className="irow">
+                  <div className="nw"><div className="fl">Columns</div>
+                    <input type="number" value={cols} min={1} max={30} onChange={e=>setCols(Math.max(1,+e.target.value))}/>
                   </div>
-                  <div className="num-wrap">
-                    <div className="field-label">Rows</div>
-                    <input type="number" value={rows} min={1} max={26}
-                      onChange={e => setRows(Number(e.target.value))} />
+                  <div className="nw"><div className="fl">Rows</div>
+                    <input type="number" value={rows} min={1} max={30} onChange={e=>setRows(Math.max(1,+e.target.value))}/>
                   </div>
-                </div>
-                {gridTooBig && <div className="warn">⚠ Grid exceeds A4. Max 8 cols / 11 rows for 1-inch cells.</div>}
-                <div className="info-card">
-                  <div className="info-row"><span className="k">Grid area</span><span className="v">{cols}" × {rows}"</span></div>
-                  <div className="info-row"><span className="k">A4 sheet</span><span className="v">{A4_W_IN}" × {A4_H_IN}"</span></div>
-                  <div className="info-row"><span className="k">Side margins</span><span className="v accent">{marginSide}" each</span></div>
-                  <div className="info-row"><span className="k">Top / Bottom</span><span className="v accent">{marginTopVal}" each</span></div>
-                  <div className="info-row"><span className="k">Export size</span><span className="v">{A4_W_PX} × {A4_H_PX}px</span></div>
                 </div>
               </div>
-
-              <div className="divider" />
-
-              {/* Grid Lines */}
               <div>
-                <div className="section-label">Grid Lines</div>
-                <div className="color-row">
-                  <div className="color-wrap">
-                    <div className="field-label">Color</div>
-                    <input type="color" value={lineColor} onChange={e => setLineColor(e.target.value)} />
-                  </div>
-                  <div className="num-wrap">
-                    <div className="field-label">Width px</div>
-                    <input type="number" value={lineWidth} min={0.5} max={6} step={0.5}
-                      onChange={e => setLineWidth(Number(e.target.value))} />
-                  </div>
+                <div className="slabel">Cell Size (inches)</div>
+                <div className="nw">
+                  <div className="fl">Inches per cell</div>
+                  <input type="number" value={cellIn} min={0.25} max={6} step={0.25}
+                    onChange={e=>setCellIn(Math.max(0.25,+e.target.value))}/>
                 </div>
-                <div className="slider-wrap">
-                  <div className="field-label">Opacity — {Math.round(lineOpacity * 100)}%</div>
-                  <input type="range" value={lineOpacity} min={0.1} max={1} step={0.05}
-                    onChange={e => setLineOpacity(Number(e.target.value))} />
+                <div style={{marginTop:6,fontSize:8.5,color:"var(--muted)",lineHeight:1.8}}>
+                  Quick set:&nbsp;
+                  {[0.5,0.75,1,1.25,1.5,2].map(v=>(
+                    <span key={v} style={{color:"var(--gold)",cursor:"pointer",marginRight:6}} onClick={()=>setCellIn(v)}>{v}"</span>
+                  ))}
                 </div>
               </div>
+              {tooBig&&<div className="warn">⚠ Grid ({gridWin.toFixed(2)}"×{gridHin.toFixed(2)}") exceeds A4 ({A4_W_IN}"×{A4_H_IN}"). Reduce cells or cell size.</div>}
+              <div className="icard">
+                <div className="ir"><span className="k">Grid area</span><span className="v">{gridWin.toFixed(2)}" × {gridHin.toFixed(2)}"</span></div>
+                <div className="ir"><span className="k">Cell size</span><span className="va">{cellIn}" × {cellIn}"</span></div>
+                <div className="ir"><span className="k">Total cells</span><span className="v">{cols*rows}</span></div>
+                <div className="ir"><span className="k">A4 page</span><span className="v">{A4_W_IN}" × {A4_H_IN}"</span></div>
+                <div className="ir"><span className="k">Side margin</span><span className="va">{mSide}" each</span></div>
+                <div className="ir"><span className="k">Top/bottom</span><span className="va">{mTop}" each</span></div>
+              </div>
+              <div style={{height:8}}/>
+            </div>
 
-              <div className="divider" />
-
-              {/* Image */}
+            {/* ── Lines Tab ── */}
+            <div className={`panel${tab==="lines"?"":" off"}`}>
               <div>
-                <div className="section-label">Reference Image</div>
-                <div
-                  className={`drop-zone${dragging ? " drag-active" : ""}`}
-                  onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current.click()}
-                >
-                  <div className="drop-icon">{image ? "🖼" : "⬆"}</div>
-                  <div className="drop-text">
-                    {image
-                      ? <><strong>Image loaded</strong><br />Tap to replace</>
-                      : <><strong>Drop or tap to browse</strong><br />JPG, PNG, WEBP</>
-                    }
+                <div className="slabel">Line Style</div>
+                <div className="crow">
+                  <div className="cw"><div className="fl">Color</div>
+                    <input type="color" value={lColor} onChange={e=>setLColor(e.target.value)}/>
+                  </div>
+                  <div className="nw"><div className="fl">Width px</div>
+                    <input type="number" value={lWidth} min={0.5} max={8} step={0.5} onChange={e=>setLWidth(+e.target.value)}/>
                   </div>
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*"
-                  onChange={e => loadImage(e.target.files[0])} style={{ display: "none" }} />
-                {image && (
-                  <button className="btn btn-ghost"
-                    onClick={() => { imgRef.current = null; setImage(null); }}>
-                    ✕ Remove Image
-                  </button>
+                <div className="slw">
+                  <div className="fl">Opacity — {Math.round(lOpacity*100)}%</div>
+                  <input type="range" value={lOpacity} min={0.05} max={1} step={0.05} onChange={e=>setLOpacity(+e.target.value)}/>
+                </div>
+              </div>
+              <div>
+                <div className="slabel">Presets</div>
+                <div className="chips">
+                  {[
+                    {l:"Red",  c:"#d94f3a",w:1.5,o:0.85},{l:"Gold",c:"#c8a84b",w:1.5,o:0.85},
+                    {l:"Black",c:"#1a1a1a",w:1,  o:1  },{l:"Blue",c:"#4a8fcb",w:1.5,o:0.8 },
+                    {l:"White",c:"#ffffff",w:1,  o:0.7},{l:"Gray", c:"#888",  w:1,  o:0.6 },
+                    {l:"Green",c:"#3a9e68",w:1.5,o:0.85},{l:"Pink",c:"#e06090",w:1.5,o:0.8},
+                  ].map(p=>(
+                    <button key={p.l} className={`chip${lColor===p.c?" on":""}`}
+                      onClick={()=>{setLColor(p.c);setLWidth(p.w);setLOpacity(p.o);}}>
+                      <span style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:p.c,marginRight:4,verticalAlign:"middle",border:"1px solid rgba(255,255,255,0.2)"}}/>
+                      {p.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{height:8}}/>
+            </div>
+
+            {/* ── Image Tab ── */}
+            <div className={`panel${tab==="image"?"":" off"}`}>
+              <div>
+                <div className="slabel">Load Image</div>
+                <div className={`dzone${dragging?" drag":""}`}
+                  onDragOver={e=>{e.preventDefault();setDragging(true);}}
+                  onDragLeave={()=>setDragging(false)}
+                  onDrop={onDrop}
+                  onClick={()=>fileRef.current.click()}>
+                  <div className="dicon">{image?"🖼":"⬆"}</div>
+                  <div className="dtext">
+                    {image?<><strong>Image loaded</strong><br/>Tap to replace</>
+                          :<><strong>Drop or tap to browse</strong><br/>JPG · PNG · WEBP · GIF</>}
+                  </div>
+                </div>
+                <input ref={fileRef} type="file" accept="image/*"
+                  onChange={e=>loadImg(e.target.files[0])} style={{display:"none"}}/>
+                {imgMeta&&(
+                  <div className="ithumb">
+                    <img src={image} alt="ref"/>
+                    <div className="ithumb-info">
+                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"68%"}}>{imgMeta.name}</span>
+                      <span>{imgMeta.w}×{imgMeta.h} · <em>{imgMeta.size}kb</em></span>
+                    </div>
+                  </div>
                 )}
+                {image&&<button className="btn ghost" onClick={()=>{imgRef.current=null;setImage(null);setImgMeta(null);}}>✕ Remove Image</button>}
               </div>
+              <div>
+                <div className="slabel">Image Fit Mode</div>
+                <div className="ftog">
+                  {[{id:"fill",l:"Stretch"},{id:"fit",l:"Fit"},{id:"cover",l:"Cover"}].map(m=>(
+                    <button key={m.id} className={`fbtn${fitMode===m.id?" on":""}`}
+                      onClick={()=>setFitMode(m.id)}>{m.l}</button>
+                  ))}
+                </div>
+                <div style={{marginTop:7,fontSize:8.5,color:"var(--muted)",lineHeight:1.75,padding:"0 1px"}}>
+                  {{
+                    fill:"Stretches image to fill entire grid exactly. Aspect ratio changes if grid ratio differs from image.",
+                    fit: "Preserves original aspect ratio fully. White space may appear inside grid borders.",
+                    cover:"Fills full grid while keeping aspect ratio — edges may be cropped."
+                  }[fitMode]}
+                </div>
+              </div>
+              <div style={{height:8}}/>
+            </div>
 
-              <div style={{ height: 8 }} />
+            {/* ── Export Tab ── */}
+            <div className={`panel${tab==="export"?"":" off"}`}>
+              <div>
+                <div className="slabel">File Format</div>
+                <div className="chips">
+                  {[{id:"png",d:"Lossless · Best for print"},{id:"jpg",d:"Smaller · Web sharing"},{id:"webp",d:"Modern · Smallest size"}].map(f=>(
+                    <button key={f.id} className={`chip${eFmt===f.id?" on":""}`}
+                      onClick={()=>setEFmt(f.id)} title={f.d}>{f.id.toUpperCase()}</button>
+                  ))}
+                </div>
+                <div style={{marginTop:6,fontSize:8.5,color:"var(--muted)"}}>
+                  {{png:"Lossless · Best for printing · Larger file",jpg:"Great for sharing · 92% quality · Smaller",webp:"Modern format · Very small · Excellent quality"}[eFmt]}
+                </div>
+              </div>
+              <div>
+                <div className="slabel">Export DPI</div>
+                <div className="chips">
+                  {[72,96,150,200,300].map(d=>(
+                    <button key={d} className={`chip${eDPI===d?" blue-on":""}`} onClick={()=>setEDPI(d)}>{d}</button>
+                  ))}
+                </div>
+                <div style={{marginTop:6,fontSize:8.5,color:"var(--muted)",lineHeight:1.7}}>
+                  {eDPI===72&&"Screen only · Not for print"}{eDPI===96&&"Good for web / digital"}{eDPI===150&&"Print ready · Recommended"}{eDPI===200&&"High-quality print"}{eDPI===300&&"Professional · Largest file"}
+                </div>
+              </div>
+              <div className="icard">
+                <div className="ir"><span className="k">Output size</span><span className="va">{expA4W} × {expA4H}px</span></div>
+                <div className="ir"><span className="k">Grid pixels</span><span className="v">{expGridW} × {expGridH}px</span></div>
+                <div className="ir"><span className="k">Cell pixels</span><span className="v">{Math.round(expCellPx)} × {Math.round(expCellPx)}px</span></div>
+                <div className="ir"><span className="k">Format</span><span className="va">{eFmt.toUpperCase()} · {eDPI} DPI</span></div>
+              </div>
+              <div style={{height:8}}/>
             </div>
 
             {/* Footer */}
-            <div className="sidebar-footer">
-              <button className={`btn btn-export${exported ? " success" : ""}`} onClick={exportPNG}>
-                {exported ? "✓ Exported!" : "↓ Export A4 PNG"}
+            <div className="sbfoot">
+              <button className={`btn expbtn${exported?" ok":""}`} onClick={doExport} disabled={exporting}>
+                {exporting?"⏳ Preparing…":exported?"✓ Saved!":(`↓ Export ${eFmt.toUpperCase()}`)}
               </button>
-              <div className="print-hint">
-                150 DPI · White margins · Centered<br />
+              <div className="phint">
+                {eDPI} DPI · {eFmt.toUpperCase()} · White margins<br/>
                 Print at <strong>100% actual size</strong>
               </div>
             </div>
           </aside>
 
-          {/* Preview */}
-          <main className="main" ref={containerRef}>
-            <div className="preview-label">Print Preview — A4 Sheet</div>
-            <div className="canvas-wrap">
-              <canvas ref={previewRef} width={previewA4W} height={previewA4H} />
+          {/* ── Preview ── */}
+          <main className="main" ref={mainRef}>
+            <div className="pvlabel">Print Preview — A4 Sheet</div>
+            <div className="couter">
+              <div className="rulh">{cols} cols × {cellIn}" = {gridWin.toFixed(2)}"</div>
+              <div className="rulv">{rows} rows × {cellIn}" = {gridHin.toFixed(2)}"</div>
+              <div className="cwrap">
+                <canvas ref={previewRef} width={pvA4W} height={pvA4H}/>
+              </div>
             </div>
-            <div className="preview-footer">
-              <span>{cols} × {rows}</span> grid &nbsp;·&nbsp;
-              each cell = <span>1 inch</span> &nbsp;·&nbsp;
-              margins <span>{marginSide}"</span> · <span>{marginTopVal}"</span>
+            <div className="pvfoot">
+              <span>{cols} × {rows}</span> cells &nbsp;·&nbsp;
+              <span>{cellIn}"</span>/cell &nbsp;·&nbsp;
+              margins <span>{mSide}"</span>·<span>{mTop}"</span> &nbsp;·&nbsp;
+              <span>{eFmt.toUpperCase()}</span> @ <span>{eDPI}</span> DPI
             </div>
           </main>
         </div>
